@@ -6,117 +6,73 @@ import com.codenjoy.dojo.services.Direction;
 import com.codenjoy.dojo.services.Point;
 import com.codenjoy.dojo.snake.model.Elements;
 
-import java.util.*;
+import java.util.List;
 
 public class YourSolver implements Solver<Board> {
 
-    private Board board;
-
     @Override
     public String get(Board board) {
-        this.board = board;
+        if (board.getHead() == null) {
+            System.out.println("Snake is not present on the board. Moving UP by default.");
+            return Direction.UP.toString();
+        }
 
-        Point head = board.getHead();
+        LeeAlgorithmSnake.Point head = new LeeAlgorithmSnake.Point(board.getHead().getX(), board.getHead().getY());
+        System.out.println("Head position: " + head.x + ", " + head.y);
+
         List<Point> apples = board.getApples();
-
-        if (head == null) {
-            return Direction.UP.toString(); // Якщо змійка не знайдена
-        }
-
         if (apples.isEmpty()) {
-            return findSafeDirection(head).toString(); // Якщо яблук немає
+            System.out.println("No apples found on the board.");
+            return findSafeDirection(board, head).toString();
         }
 
-        // Знаходимо шлях до яблука за допомогою BFS
-        Direction nextMove = bfsToApple(head, apples);
-        if (nextMove != null) {
-            return nextMove.toString();
+        LeeAlgorithmSnake.Point apple = new LeeAlgorithmSnake.Point(apples.get(0).getX(), apples.get(0).getY());
+        System.out.println("Nearest apple position: " + apple.x + ", " + apple.y);
+
+        Direction nextMove = LeeAlgorithmSnake.getNextDirection(board, head, apple);
+        if (nextMove == null) {
+            System.out.println("No valid path to apple. Searching for safe direction.");
+            return findSafeDirection(board, head).toString();
         }
 
-        // Якщо BFS не знаходить шлях, вибираємо безпечний напрямок
-        return findSafeDirection(head).toString();
+        // Перевірка, чи наступний напрямок безпечний
+        if (!isSafe(board, head.x + nextMove.changeX(1), head.y + nextMove.changeY(1))) {
+            System.out.println("Next move leads to danger. Searching for safe direction.");
+            return findSafeDirection(board, head).toString();
+        }
+
+        System.out.println("Next move: " + nextMove);
+        return nextMove.toString();
     }
 
-    private Direction bfsToApple(Point head, List<Point> apples) {
-        Queue<Node> queue = new LinkedList<>();
-        Set<String> visited = new HashSet<>();
-        queue.add(new Node(head.getX(), head.getY(), null));
-
-        while (!queue.isEmpty()) {
-            Node current = queue.poll();
-
-            // Якщо дійшли до яблука
-            for (Point apple : apples) {
-                if (current.x == apple.getX() && current.y == apple.getY()) {
-                    return reconstructDirection(current);
-                }
-            }
-
-            // Додаємо сусідні клітинки до черги
-            for (Direction direction : Direction.values()) {
-                int nextX = current.x + direction.changeX(1);
-                int nextY = current.y + direction.changeY(1);
-
-                String key = nextX + "," + nextY; // Унікальний ключ для клітинки
-                if (!visited.contains(key) && isSafe(nextX, nextY)) {
-                    visited.add(key);
-                    queue.add(new Node(nextX, nextY, direction, current));
-                }
-            }
-        }
-
-        return null; // Якщо шлях до яблука не знайдено
-    }
-
-    private boolean isSafe(int x, int y) {
-        if (board.isOutOfField(x, y)) {
-            return false; // Якщо точка за межами поля
-        }
-
-        // Дізнаємось, що знаходиться в клітинці
-        Elements element = board.getAt(x, y);
-
-        // Друк для відладки
-        System.out.println("Element at (" + x + ", " + y + "): " + element);
-
-        // Перевіряємо, чи клітинка порожня або містить яблуко
-        return element == Elements.NONE || element == Elements.GOOD_APPLE; // Замініть GOOD_APPLE на правильну назву
-    }
-
-    private Direction findSafeDirection(Point head) {
+    private Direction findSafeDirection(Board board, LeeAlgorithmSnake.Point head) {
         for (Direction direction : Direction.values()) {
-            int nextX = head.getX() + direction.changeX(1);
-            int nextY = head.getY() + direction.changeY(1);
-            if (isSafe(nextX, nextY)) {
+            int nextX = head.x + direction.changeX(1);
+            int nextY = head.y + direction.changeY(1);
+
+            if (isSafe(board, nextX, nextY)) {
+                System.out.println("Safe direction found: " + direction);
                 return direction;
             }
         }
-        return Direction.UP; // Якщо немає безпечного напряму
+
+        System.out.println("No safe direction found. Moving UP by default.");
+        return Direction.UP;
     }
 
-    private Direction reconstructDirection(Node node) {
-        while (node.previous != null && node.previous.previous != null) {
-            node = node.previous;
+
+    private boolean isSafe(Board board, int x, int y) {
+        if (board.isOutOfField(x, y)) {
+            System.out.println("Position (" + x + ", " + y + ") is out of field.");
+            return false;
         }
-        return node.direction;
+
+        Elements element = board.getAt(x, y);
+        System.out.println("Position (" + x + ", " + y + ") contains: " + element);
+
+        return element == Elements.NONE || element == Elements.GOOD_APPLE;
     }
 
-    private static class Node {
-        int x, y;
-        Direction direction;
-        Node previous;
-
-        Node(int x, int y, Direction direction) {
-            this(x, y, direction, null);
-        }
-
-        Node(int x, int y, Direction direction, Node previous) {
-            this.x = x;
-            this.y = y;
-            this.direction = direction;
-            this.previous = previous;
-        }
-    }
 
     public static void main(String[] args) {
         WebSocketRunner.runClient(
