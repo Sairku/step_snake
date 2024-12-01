@@ -17,31 +17,54 @@ public class YourSolver implements Solver<Board> {
 
         Point head = board.getHead();
         List<Point> apples = board.getApples();
+        List<Point> barriers = board.getBarriers();
 
         if (apples.isEmpty()) {
-            return Direction.UP.toString(); // Якщо яблук немає, змійка рухається вгору
+            return getSafeDirection(head, barriers, Direction.UP); // Якщо яблук немає, обираємо безпечний напрямок
         }
 
-        Point apple = apples.get(0); // Беремо перше яблуко з списку
-        Direction direction = calculateDirection(head, apple);
+        Point apple = apples.get(0); // Беремо перше яблуко
+        Direction direction = calculateDirection(head, apple, barriers);
 
-        return direction != null ? direction.toString() : Direction.UP.toString();
+        return direction != null ? direction.toString() : getSafeDirection(head, barriers, Direction.UP);
     }
 
-    private Direction calculateDirection(Point from, Point to) {
-        if (from.getX() < to.getX()) {
+    private Direction calculateDirection(Point from, Point to, List<Point> barriers) {
+        // Перевіряємо можливість руху у всіх напрямках
+        if (from.getX() < to.getX() && isSafe(from.getX() + 1, from.getY(), barriers)) {
             return Direction.RIGHT;
         }
-        if (from.getX() > to.getX()) {
+        if (from.getX() > to.getX() && isSafe(from.getX() - 1, from.getY(), barriers)) {
             return Direction.LEFT;
         }
-        if (from.getY() < to.getY()) {
+        if (from.getY() < to.getY() && isSafe(from.getX(), from.getY() + 1, barriers)) {
             return Direction.UP;
         }
-        if (from.getY() > to.getY()) {
+        if (from.getY() > to.getY() && isSafe(from.getX(), from.getY() - 1, barriers)) {
             return Direction.DOWN;
         }
-        return null;
+        return null; // Якщо немає безпечного напрямку
+    }
+
+    private boolean isSafe(int x, int y, List<Point> barriers) {
+        for (Point barrier : barriers) {
+            if (barrier.getX() == x && barrier.getY() == y) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private String getSafeDirection(Point head, List<Point> barriers, Direction defaultDirection) {
+        // Спробуємо рухатись у безпечному напрямку
+        for (Direction direction : Direction.values()) {
+            int newX = head.getX() + direction.changeX(1);
+            int newY = head.getY() + direction.changeY(1);
+            if (isSafe(newX, newY, barriers)) {
+                return direction.toString();
+            }
+        }
+        return defaultDirection.toString(); // Якщо безпечного напрямку немає, обираємо за замовчуванням
     }
 
     public static void main(String[] args) {
