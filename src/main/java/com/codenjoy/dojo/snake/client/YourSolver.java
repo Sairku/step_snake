@@ -1,70 +1,85 @@
 package com.codenjoy.dojo.snake.client;
 
 import com.codenjoy.dojo.client.Solver;
+import com.codenjoy.dojo.services.Dice;
 import com.codenjoy.dojo.services.Direction;
 import com.codenjoy.dojo.services.Point;
 import com.codenjoy.dojo.client.WebSocketRunner;
 
-import java.util.List;
+import java.util.*;
 
 public class YourSolver implements Solver<Board> {
+        private Dice dice;
+        private Board board;
 
     @Override
     public String get(Board board) {
-        if (board.isGameOver()) {
-            return Direction.UP.toString(); // Якщо гра закінчилась, обираємо будь-який напрямок
-        }
+        this.board = board;
 
         Point head = board.getHead();
-        List<Point> apples = board.getApples();
-        List<Point> barriers = board.getBarriers();
+        Point apple = board.getApples().get(0);
 
-        if (apples.isEmpty()) {
-            return getSafeDirection(head, barriers, Direction.UP); // Якщо яблук немає, обираємо безпечний напрямок
+        List<Point> obstacles = new ArrayList<>();
+        obstacles.addAll(board.getSnake());
+        obstacles.addAll(board.getWalls());
+        obstacles.addAll(board.getStones());
+
+        List<Point> path = findShortestPath(head, apple, obstacles);
+
+        if (path != null && path.size() > 1) {
+            Point nextPoint = path.get(1);
+            return getDirection(head, nextPoint);
         }
 
-        Point apple = apples.get(0); // Беремо перше яблуко
-        Direction direction = calculateDirection(head, apple, barriers);
-
-        return direction != null ? direction.toString() : getSafeDirection(head, barriers, Direction.UP);
-    }
-
-    private Direction calculateDirection(Point from, Point to, List<Point> barriers) {
-        // Перевіряємо можливість руху у всіх напрямках
-        if (from.getX() < to.getX() && isSafe(from.getX() + 1, from.getY(), barriers)) {
-            return Direction.RIGHT;
-        }
-        if (from.getX() > to.getX() && isSafe(from.getX() - 1, from.getY(), barriers)) {
-            return Direction.LEFT;
-        }
-        if (from.getY() < to.getY() && isSafe(from.getX(), from.getY() + 1, barriers)) {
-            return Direction.UP;
-        }
-        if (from.getY() > to.getY() && isSafe(from.getX(), from.getY() - 1, barriers)) {
-            return Direction.DOWN;
-        }
-        return null; // Якщо немає безпечного напрямку
-    }
-
-    private boolean isSafe(int x, int y, List<Point> barriers) {
-        for (Point barrier : barriers) {
-            if (barrier.getX() == x && barrier.getY() == y) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    private String getSafeDirection(Point head, List<Point> barriers, Direction defaultDirection) {
-        // Спробуємо рухатись у безпечному напрямку
         for (Direction direction : Direction.values()) {
-            int newX = head.getX() + direction.changeX(1);
-            int newY = head.getY() + direction.changeY(1);
-            if (isSafe(newX, newY, barriers)) {
+            Point nextPoint = direction.change(head);
+            if (!obstacles.contains(nextPoint)) {
                 return direction.toString();
             }
         }
-        return defaultDirection.toString(); // Якщо безпечного напрямку немає, обираємо за замовчуванням
+
+        return Direction.UP.toString();
+    }
+
+    private List<Point> findShortestPath(Point start, Point goal, List<Point> obstacles) {
+        Queue<List<Point>> queue = new LinkedList<>();
+        Set<Point> visited = new HashSet<>();
+
+        queue.add(Collections.singletonList(start));
+        visited.add(start);
+
+        while (!queue.isEmpty()) {
+            List<Point> path = queue.poll();
+            Point current = path.get(path.size() - 1);
+
+            if (current.equals(goal)) {
+                return path;
+            }
+
+            for (Direction direction : Direction.values()) {
+                Point next = direction.change(current);
+                if (!visited.contains(next) && !obstacles.contains(next)) {
+                    visited.add(next);
+                    List<Point> newPath = new ArrayList<>(path);
+                    newPath.add(next);
+                    queue.add(newPath);
+                }
+            }
+        }
+
+        return null;
+    }
+    private String getDirection(Point head, Point nextPoint) {
+        if (nextPoint.getX() > head.getX()) {
+            return Direction.RIGHT.toString();
+        } else if (nextPoint.getX() < head.getX()) {
+            return Direction.LEFT.toString();
+        } else if (nextPoint.getY() > head.getY()) {
+            return Direction.UP.toString();
+        } else if (nextPoint.getY() < head.getY()) {
+            return Direction.DOWN.toString();
+        }
+        return Direction.UP.toString();
     }
 
     public static void main(String[] args) {
